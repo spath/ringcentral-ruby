@@ -16,7 +16,7 @@ class RingCentral
   end
 
   attr_reader :client_id, :client_secret, :server, :token
-  attr_accessor :auto_refresh, :debug_mode
+  attr_accessor :auto_refresh, :debug_mode, :timer
 
   def initialize(client_id, client_secret, server, debug_mode = false)
     @client_id = client_id
@@ -30,6 +30,9 @@ class RingCentral
       faraday.request :multipart
       faraday.request :url_encoded
       faraday.response :json, content_type: /\bjson$/
+      if @debug_mode
+        faraday.response :logger, ::Logger.new(STDOUT), bodies: true
+      end
       faraday.adapter Faraday.default_adapter
     end
   end
@@ -41,7 +44,13 @@ class RingCentral
       @timer = nil
     end
     if @auto_refresh && value != nil
-      @timer = Concurrent::TimerTask.new(execution_interval: value['expires_in'] - 120, timeout_interval: 60) { self.refresh }
+      #@timer = Concurrent::TimerTask.new(execution_interval: value['expires_in'] - 120, timeout_interval: 60) { self.refresh }
+      @timer = Concurrent::TimerTask.new(execution_interval: value['expires_in'] - 120) do
+        if @debug_mode
+          puts "Debug: Timer task is firing now."
+        end
+        self.refresh
+      end
       @timer.execute
     end
   end
